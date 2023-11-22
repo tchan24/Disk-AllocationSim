@@ -1,22 +1,22 @@
-// DiskDrive.java
 public class DiskDrive {
-    // Implement disk drive simulation
-}
+    private final int BLOCK_SIZE = 512;
+    private final int NUM_BLOCKS = 256;
+    private byte[][] blocks;
 
-// FileSystem.java
-public class FileSystem {
-    // Implement file system operations
-}
-
-// UserInterface.java
-public class UserInterface {
-    // Implement user interaction methods
-}
-
-// Main.java
-public class Main {
-    public static void main(String[] args) {
-        // Parse command-line arguments
-        // Initialize and start the simulation
+    public DiskDrive() {
+        blocks = new byte[NUM_BLOCKS][BLOCK_SIZE];
+        // Initialize blocks here (e.g., setting up the FAT and bitmap)
     }
+
+    public byte[] readBlock(int blockNumber) {
+        // Implement reading a block
+        return blocks[blockNumber];
+    }
+
+    public void writeBlock(int blockNumber, byte[] data) {
+        // Implement writing to a block
+        blocks[blockNumber] = data;
+    }
+
+    // Additional methods for handling bitmap and FAT
 }

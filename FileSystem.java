@@ -1,6 +1,7 @@
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.stream.IntStream;
 
 public class FileSystem {
     private DiskDrive diskDrive;
@@ -23,23 +24,37 @@ public class FileSystem {
         for (int i = 0; i < freeBlocks.length; i++) {
             diskDrive.writeBlock(freeBlocks[i], Arrays.copyOfRange(data, i * DiskDrive.BLOCK_SIZE, (i + 1) * DiskDrive.BLOCK_SIZE));
         }
-        updateFAT(freeBlocks[0], freeBlocks);
+        updateFAT(fileName, freeBlocks[0], freeBlocks.length);
         updateBitmap(freeBlocks, true);
     }
     
 
     private int[] findFreeBlocks(int dataSize) {
-        // Example implementation for contiguous allocation
-        int requiredBlocks = (int) Math.ceil((double) dataSize / DiskDrive.BLOCK_SIZE);
-        byte[] bitmap = diskDrive.readBlock(BITMAP_BLOCK_NUM);
-    
-        for (int i = 0; i < bitmap.length; i++) {
-            // Find a contiguous sequence of free blocks
-            // Implement logic based on the allocation strategy
+    byte[] bitmap = diskDrive.readBlock(BITMAP_BLOCK_NUM);
+    int requiredBlocks = (int) Math.ceil((double) dataSize / DiskDrive.getBlockSize());
+
+    for (int i = 0; i < bitmap.length * 8; i++) {
+        if (isBlockFree(bitmap, i)) {
+            int freeCount = 1;
+            while (freeCount < requiredBlocks && isBlockFree(bitmap, i + freeCount)) {
+                freeCount++;
+            }
+            if (freeCount == requiredBlocks) {
+                return IntStream.range(i, i + freeCount).toArray();
+            }
+            i += freeCount;
         }
-    
-        return new int[0]; // Placeholder for found block numbers
     }
+    return new int[0]; // No sufficient contiguous free space found
+}
+
+    private boolean isBlockFree(byte[] bitmap, int blockIndex) {
+        int byteIndex = blockIndex / 8;
+        int bitIndex = blockIndex % 8;
+        return (bitmap[byteIndex] & (1 << bitIndex)) == 0;
+    }
+
+    
     
     public class FileMetadata {
         private int startBlock;
@@ -64,19 +79,25 @@ public class FileSystem {
 
     // Methods to read, update, and delete files
 
-    private void updateFAT(int fileStartBlock, int[] fileBlocks) {
-        // Update FAT with file block information
-        byte[] fatBlock = diskDrive.readBlock(FAT_BLOCK_NUM);
-        // Logic to update FAT entries
-        diskDrive.writeBlock(FAT_BLOCK_NUM, fatBlock);
+    private void updateFAT(String fileName, int startBlock, int length) {
+        // This is a simplified version. You need to define how you store this information.
+        fileTable.put(fileName, new FileMetadata(startBlock, length));
     }
     
-    private void updateBitmap(int[] usedBlocks, boolean used) {
-        // Update bitmap to reflect block usage
-        byte[] bitmapBlock = diskDrive.readBlock(BITMAP_BLOCK_NUM);
-        // Logic to update bitmap entries
-        diskDrive.writeBlock(BITMAP_BLOCK_NUM, bitmapBlock);
-    }
+    private void updateBitmap(int[] blocks, boolean used) {
+        byte[] bitmap = diskDrive.readBlock(BITMAP_BLOCK_NUM);
+        for (int block : blocks) {
+            int byteIndex = block / 8;
+            int bitIndex = block % 8;
+            if (used) {
+                bitmap[byteIndex] |= (1 << bitIndex);
+            } else {
+                bitmap[byteIndex] &= ~(1 << bitIndex);
+            }
+        }
+        diskDrive.writeBlock(BITMAP_BLOCK_NUM, bitmap);
+    }    
+    
     
     public byte[] readFile(String fileName) {
         FileMetadata metadata = fileTable.get(fileName);
@@ -84,9 +105,12 @@ public class FileSystem {
             throw new IllegalArgumentException("File not found");
         }
 
-        byte[] data = new byte[metadata.getLength() * DiskDrive.getBlockSize()];
-        for (int i = 0; i < metadata.getLength(); i++) {
-            System.arraycopy(diskDrive.readBlock(metadata.getStartBlock() + i), 0, data, i * DiskDrive.getBlockSize(), DiskDrive.getBlockSize());
+        int fileLength = metadata.getLength();
+        int startBlock = metadata.getStartBlock();
+
+        byte[] data = new byte[fileLength * DiskDrive.getBlockSize()];
+        for (int i = 0; i < fileLength; i++) {
+            System.arraycopy(diskDrive.readBlock(startBlock + i), 0, data, i * DiskDrive.getBlockSize(), DiskDrive.getBlockSize());
         }
         return data;
     }
@@ -105,7 +129,7 @@ public class FileSystem {
         }
 
         // Clear the FAT entries and update the bitmap
-        updateFAT(0, new int[]{metadata.getStartBlock()}); // Simplified for illustration
+        updateFAT(fileName, metadata.getStartBlock(), 0); // Setting length to 0 to indicate deletion
         updateBitmap(new int[]{metadata.getStartBlock()}, false);
         fileTable.remove(fileName);
     }

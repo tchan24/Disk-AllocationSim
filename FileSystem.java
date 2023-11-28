@@ -30,23 +30,23 @@ public class FileSystem {
     
 
     private int[] findFreeBlocks(int dataSize) {
-    byte[] bitmap = diskDrive.readBlock(BITMAP_BLOCK_NUM);
-    int requiredBlocks = (int) Math.ceil((double) dataSize / DiskDrive.getBlockSize());
+        byte[] bitmap = diskDrive.readBlock(BITMAP_BLOCK_NUM);
+        int requiredBlocks = (int) Math.ceil((double) dataSize / DiskDrive.getBlockSize());
 
-    for (int i = 0; i < bitmap.length * 8; i++) {
-        if (isBlockFree(bitmap, i)) {
-            int freeCount = 1;
-            while (freeCount < requiredBlocks && isBlockFree(bitmap, i + freeCount)) {
-                freeCount++;
+        for (int i = 0; i < bitmap.length * 8; i++) {
+            if (isBlockFree(bitmap, i)) {
+               int freeCount = 1;
+                while (freeCount < requiredBlocks && isBlockFree(bitmap, i + freeCount)) {
+                    freeCount++;
+                }
+                if (freeCount == requiredBlocks) {
+                    return IntStream.range(i, i + freeCount).toArray();
+                }
+                i += freeCount;
             }
-            if (freeCount == requiredBlocks) {
-                return IntStream.range(i, i + freeCount).toArray();
-            }
-            i += freeCount;
         }
+        return new int[0]; // No sufficient contiguous free space found
     }
-    return new int[0]; // No sufficient contiguous free space found
-}
 
     private boolean isBlockFree(byte[] bitmap, int blockIndex) {
         int byteIndex = blockIndex / 8;
@@ -132,6 +132,10 @@ public class FileSystem {
         updateFAT(fileName, metadata.getStartBlock(), 0); // Setting length to 0 to indicate deletion
         updateBitmap(new int[]{metadata.getStartBlock()}, false);
         fileTable.remove(fileName);
+    }
+    
+    public byte[] getBitmap() {
+        return diskDrive.readBlock(BITMAP_BLOCK_NUM);
     }
     
     

@@ -75,5 +75,15 @@ public class UserInterface {
         }
     }
 
+    private void displayBitmap() {
+        byte[] bitmap = fileSystem.getBitmap();
+        StringBuilder bitmapDisplay = new StringBuilder();
+        for (byte b : bitmap) {
+            bitmapDisplay.append(String.format("%8s", Integer.toBinaryString(b & 0xFF)).replace(' ', '0'));
+        }
+        System.out.println("Bitmap: " + bitmapDisplay.toString());
+    }
+    
+
     // Additional methods to support other operations
 }

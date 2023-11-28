@@ -16,7 +16,7 @@ public class DiskDrive {
 
     private void initializeFAT() {
         // Initialize the first block with FAT data
-        // For simplicity, we can initially set it all to zero.
+        // For simplicity, can initially set it all to zero.
         for(int i = 0; i < BLOCK_SIZE; i++) {
             blocks[0][i] = 0;
         }

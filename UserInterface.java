@@ -14,10 +14,13 @@ public class UserInterface {
         while (!exit) {
             // Display menu
             System.out.println("\n1) Display a file");
-            System.out.println("2) Create a file");
-            System.out.println("3) Update a file");
-            System.out.println("4) Delete a file");
-            System.out.println("5) Exit");
+            System.out.println("2) Display the file table");
+            System.out.println("3) Display the free space bitmap");
+            System.out.println("4) Display a disk block");
+            System.out.println("5) Copy a file from the simulation to a file on the real system");
+            System.out.println("6) Copy a file from the real system to a file in the simulation");
+            System.out.println("7) Delete a file");
+            System.out.println("8) Exit");
             System.out.print("Choice: ");
 
             int choice = scanner.nextInt();
@@ -75,6 +78,10 @@ public class UserInterface {
         }
     }
 
+    private void displayFAT() {
+        // Implement logic to display the file table
+    }
+    
     private void displayBitmap() {
         byte[] bitmap = fileSystem.getBitmap();
         StringBuilder bitmapDisplay = new StringBuilder();

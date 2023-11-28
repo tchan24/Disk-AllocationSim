@@ -10,12 +10,22 @@ public class FileSystem {
     private final static int BITMAP_BLOCK_NUM = 1;
     private final static int MAX_FILE_SIZE = 10; // Maximum blocks per file
 
-    public FileSystem(DiskDrive diskDrive) {
+    private String allocationMethod;
+
+    public FileSystem(DiskDrive diskDrive, String allocationMethod) {
         this.diskDrive = diskDrive;
-        this.fileTable = new HashMap<>();
+        this.allocationMethod = allocationMethod;
+        // Initialization based on allocation method
     }
 
     public void createFile(String fileName, byte[] data) {
+        if (fileName.length() > 8 || !fileName.matches("[a-z]+")) {
+            throw new IllegalArgumentException("Invalid file name");
+        }
+        if (data.length > MAX_FILE_SIZE * DiskDrive.getBlockSize()) {
+            throw new IllegalArgumentException("File size exceeds maximum limit");
+        }
+        
         int[] freeBlocks = findFreeBlocks(data.length);
         if (freeBlocks.length == 0) {
             throw new IllegalStateException("No free blocks available");

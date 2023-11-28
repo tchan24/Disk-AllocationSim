@@ -1,6 +1,6 @@
 public class DiskDrive {
     public final static int BLOCK_SIZE = 512;
-    private final static int NUM_BLOCKS = 256;
+    public final static int NUM_BLOCKS = 256;
     private byte[][] blocks;
 
     public static int getBlockSize() {

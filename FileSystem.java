@@ -156,5 +156,15 @@ public class FileSystem {
         diskDrive.writeBlock(1, bitmap);
     }
 
+    public byte[] readDiskBlock(int blockNumber) {
+        // Validate block number
+        if (blockNumber < 0 || blockNumber >= DiskDrive.NUM_BLOCKS) {
+            throw new IllegalArgumentException("Invalid block number");
+        }
+    
+        // Return the block data
+        return diskDrive.readBlock(blockNumber);
+    }
+    
     // Additional methods like updateFile, deleteFile, etc. will be added in subsequent parts
 }

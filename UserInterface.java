@@ -8,6 +8,7 @@ import java.util.Scanner;
 public class UserInterface {
     private FileSystem fileSystem;
     private Scanner scanner;
+    private DiskDrive diskDrive;
 
     public UserInterface(FileSystem fileSystem) {
         this.fileSystem = fileSystem;
@@ -122,9 +123,9 @@ public class UserInterface {
         System.out.print("Enter disk block number to display: ");
         int blockNumber = scanner.nextInt();
         scanner.nextLine(); // Consume the newline
-
+    
         try {
-            byte[] blockData = fileSystem.readBlock(blockNumber);
+            byte[] blockData = fileSystem.readDiskBlock(blockNumber);
             System.out.println("Block " + blockNumber + " Content: " + Arrays.toString(blockData));
         } catch (Exception e) {
             System.out.println("Error: " + e.getMessage());
@@ -155,7 +156,7 @@ public class UserInterface {
         }
 
         // Return the block data
-        return DiskDrive.readBlock(blockNumber);
+        return diskDrive.readBlock(blockNumber);
     }
     
     // Additional methods to support other operations

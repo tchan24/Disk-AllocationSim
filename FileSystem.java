@@ -20,22 +20,31 @@ public class FileSystem {
     }
 
     public class FileMetadata {
-    private int startBlock;
-    private int length;
+        private int startBlock;
+        private int length;
+        private int indexBlock;
 
-    public FileMetadata(int startBlock, int length) {
-        this.startBlock = startBlock;
-        this.length = length;
-    }
+        public FileMetadata(int startBlock, int length) {
+            this.startBlock = startBlock;
+            this.length = length;
+        }
+        
+        public FileMetadata(int indexBlock) {
+            this.indexBlock = indexBlock;
+        }
 
-    public int getStartBlock() {
-        return startBlock;
-    }
+        public int getIndexBlock() {
+            return indexBlock;
+        }
 
-    public int getLength() {
-        return length;
+        public int getStartBlock() {
+            return startBlock;
+        }
+
+        public int getLength() {
+            return length;
+        }
     }
-}
 
 
     public void createFile(String fileName, byte[] data) {
@@ -43,6 +52,8 @@ public class FileSystem {
             createFileContiguous(fileName, data);
         } else if (allocationMethod.equals("chained")) {
             createFileChained(fileName, data);
+        } else if (allocationMethod.equals("indexed")) {
+            createFileIndexed(fileName, data);
         } else {
             throw new IllegalStateException("Unknown allocation method: " + allocationMethod);
         }
@@ -76,6 +87,30 @@ public class FileSystem {
         updateFATForChained(fileName, freeBlocks.get(0));
         updateBitmap(convertListToArray(freeBlocks), true);
     }
+
+    private void createFileIndexed(String fileName, byte[] data) {
+        // Find a free block for the index
+        int indexBlock = findFreeIndexBlock();
+        if (indexBlock == -1) {
+            throw new IllegalStateException("No free block for index");
+        }
+    
+        // Find free blocks for the file data
+        List<Integer> dataBlocks = findFreeDataBlocks(data.length);
+        if (dataBlocks.size() * DiskDrive.getBlockSize() < data.length) {
+            throw new IllegalStateException("Not enough space for file data");
+        }
+    
+        // Write index block with the data blocks information
+        writeIndexBlock(indexBlock, dataBlocks);
+    
+        // Write file data to the data blocks
+        writeDataToBlocks(dataBlocks, data);
+    
+        // Update file table
+        fileTable.put(fileName, new FileMetadata(indexBlock));
+    }
+    
     
 
     private int[] convertListToArray(List<Integer> list) {
@@ -92,6 +127,8 @@ public class FileSystem {
             return readFileContiguous(metadata);
         } else if (allocationMethod.equals("chained")) {
             return readFileChained(metadata);
+        } else if (allocationMethod.equals("indexed")) {
+            return readFileIndexed(metadata);
         } else {
             throw new IllegalStateException("Unknown allocation method: " + allocationMethod);
         }
@@ -126,11 +163,29 @@ public class FileSystem {
         return outputStream.toByteArray();
     }
 
+    private byte[] readFileIndexed(FileMetadata metadata) {
+        int indexBlock = metadata.getIndexBlock();
+        byte[] indexData = diskDrive.readBlock(indexBlock);
+    
+        ByteArrayOutputStream dataStream = new ByteArrayOutputStream();
+        for (int i = 0; i < indexData.length; i++) {
+            if (indexData[i] == -1) break; // Assuming -1 indicates no more data blocks
+    
+            byte[] dataBlock = diskDrive.readBlock(indexData[i]);
+            dataStream.write(dataBlock, 0, DiskDrive.getBlockSize());
+        }
+    
+        return dataStream.toByteArray();
+    }
+    
+
     public void updateFile(String fileName, byte[] newData) {
         if (allocationMethod.equals("contiguous")) {
             updateFileContiguous(fileName, newData);
         } else if (allocationMethod.equals("chained")) {
             updateFileChained(fileName, newData);
+        } else if (allocationMethod.equals("indexed")) {
+            updateFileIndexed(fileName, newData);
         } else {
             throw new IllegalStateException("Unknown allocation method: " + allocationMethod);
         }
@@ -155,6 +210,15 @@ public class FileSystem {
         createFileChained(fileName, newData);
     }
 
+    private void updateFileIndexed(String fileName, byte[] newData) {
+        // Delete the existing file
+        deleteFileIndexed(fileTable.get(fileName));
+    
+        // Create a new file with the updated data
+        createFileIndexed(fileName, newData);
+    }
+    
+
     public void deleteFile(String fileName) {
         FileMetadata metadata = fileTable.get(fileName);
         if (metadata == null) {
@@ -165,6 +229,8 @@ public class FileSystem {
             deleteFileContiguous(fileName);
         } else if (allocationMethod.equals("chained")) {
             deleteFileChained(metadata);
+        } else if (allocationMethod.equals("indexed")) {
+            deleteFileIndexed(metadata);
         } else {
             throw new IllegalStateException("Unknown allocation method: " + allocationMethod);
         }
@@ -202,6 +268,40 @@ public class FileSystem {
         updateBitmap(convertListToArray(blocksToFree), false);
         fileTable.remove(metadata); // Remove the file entry from the FAT
     }
+
+    private void deleteFileIndexed(FileMetadata metadata) {
+        int indexBlock = metadata.getIndexBlock();
+        byte[] indexData = diskDrive.readBlock(indexBlock);
+    
+        // Free data blocks
+        for (int i = 0; i < indexData.length; i++) {
+            if (indexData[i] == -1) break; // Assuming -1 indicates no more data blocks
+            markBlockAsFree(indexData[i]);
+        }
+    
+        // Free index block
+        markBlockAsFree(indexBlock);
+    
+        // Update file table
+        fileTable.remove(metadata);
+    }
+    
+    private void markBlockAsFree(int blockNumber) {
+        // Read the bitmap block
+        byte[] bitmap = diskDrive.readBlock(1); // Assuming bitmap is stored in block 1
+    
+        // Calculate the byte and bit position for the block number in the bitmap
+        int byteIndex = blockNumber / 8;
+        int bitIndex = blockNumber % 8;
+    
+        // Clear the bit corresponding to the block number
+        bitmap[byteIndex] &= ~(1 << bitIndex);
+    
+        // Write the updated bitmap back to the disk
+        diskDrive.writeBlock(1, bitmap);
+    }
+    
+    
     
 
     private int[] findFreeBlocksContiguous(int dataSize) {
@@ -228,18 +328,39 @@ public class FileSystem {
         return (bitmap[byteIndex] & (1 << bitIndex)) == 0;
     }
 
-    private void writeDataToBlocks(int[] blocks, byte[] data) {
-        for (int i = 0; i < blocks.length; i++) {
-            int start = i * DiskDrive.getBlockSize();
-            int end = Math.min(start + DiskDrive.getBlockSize(), data.length);
-            byte[] blockData = new byte[DiskDrive.getBlockSize()]; // Create a block-sized array
+    private void writeDataToBlocks(List<Integer> blocks, byte[] data) {
+        int bytesPerBlock = DiskDrive.getBlockSize();
+        int dataIndex = 0;
     
-            // Copy the relevant portion of data into blockData
-            System.arraycopy(data, start, blockData, 0, end - start);
-            
-            diskDrive.writeBlock(blocks[i], blockData);
+        for (int blockNumber : blocks) {
+            byte[] blockData = new byte[bytesPerBlock];
+            int length = Math.min(dataIndex + bytesPerBlock, data.length) - dataIndex;
+            System.arraycopy(data, dataIndex, blockData, 0, length);
+    
+            diskDrive.writeBlock(blockNumber, blockData);
+            dataIndex += length;
+            if (dataIndex >= data.length) {
+                break;
+            }
         }
     }
+
+    private void writeIndexBlock(int indexBlock, List<Integer> dataBlocks) {
+        byte[] indexData = new byte[DiskDrive.getBlockSize()];
+        int i = 0;
+        for (int block : dataBlocks) {
+            indexData[i++] = (byte) block;
+            if (i >= DiskDrive.getBlockSize()) {
+                break; // Prevent exceeding the block size
+            }
+        }
+        while (i < DiskDrive.getBlockSize()) {
+            indexData[i++] = (byte) -1; // Fill the rest with -1 to indicate no more data blocks
+        }
+        diskDrive.writeBlock(indexBlock, indexData);
+    }
+    
+    
     
 
     private void updateFAT(String fileName, int startBlock, int length) {
@@ -322,7 +443,34 @@ public class FileSystem {
     private void updateFATForChained(String fileName, int startBlock) {
         fileTable.put(fileName, new FileMetadata(startBlock, -1)); // Length might not be needed for chained
     }
+
+    private int findFreeIndexBlock() {
+        byte[] bitmap = diskDrive.readBlock(1); // Assuming bitmap is stored in block 1
+        for (int i = 0; i < DiskDrive.NUM_BLOCKS; i++) {
+            if (isBlockFree(bitmap, i)) {
+                return i;
+            }
+        }
+        return -1; // Indicate that no free block is available
+    }
+    
+    
+    private List<Integer> findFreeDataBlocks(int dataSize) {
+        int requiredBlocks = (int) Math.ceil((double) dataSize / DiskDrive.getBlockSize());
+        List<Integer> freeBlocks = new ArrayList<>();
+        byte[] bitmap = diskDrive.readBlock(1); // Assuming bitmap is stored in block 1
+    
+        for (int i = 0; i < DiskDrive.NUM_BLOCKS && freeBlocks.size() < requiredBlocks; i++) {
+            if (isBlockFree(bitmap, i)) {
+                freeBlocks.add(i);
+            }
+        }
+    
+        if (freeBlocks.size() < requiredBlocks) {
+            return Collections.emptyList(); // Not enough space
+        }
+        return freeBlocks;
+    }
     
 
-    // Additional methods like updateFile, deleteFile, etc. will be added in subsequent parts
 }

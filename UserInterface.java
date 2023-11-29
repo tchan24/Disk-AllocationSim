@@ -3,6 +3,7 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.InputMismatchException;
+import java.util.Map;
 import java.util.Scanner;
 
 public class UserInterface {
@@ -108,9 +109,21 @@ public class UserInterface {
     }
 
     private void displayFAT() {
-        // Logic to fetch and display the file allocation table
-        // This will depend on how you have structured your FAT
-    }
+        Map<String, FileSystem.FileMetadata> fileTable = fileSystem.fileTable;
+
+        if (fileTable.isEmpty()) {
+            System.out.println("The file allocation table is currently empty.");
+            return;
+        }
+
+        System.out.println("File Allocation Table:");
+        System.out.println("FileName\tStartBlock\tLength");
+        for (Map.Entry<String, FileSystem.FileMetadata> entry : fileTable.entrySet()) {
+            FileSystem.FileMetadata metadata = entry.getValue();
+            System.out.println(entry.getKey() + "\t\t" + metadata.getStartBlock() + "\t\t" + metadata.getLength());
+        }
+}
+
     
     private void displayBitmap() {
         byte[] bitmap = fileSystem.getBitmap();

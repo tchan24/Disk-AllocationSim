@@ -5,12 +5,13 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.stream.IntStream;
 
 public class FileSystem {
     private DiskDrive diskDrive;
     private String allocationMethod;
-    private Map<String, FileMetadata> fileTable;
+    public Map<String, FileMetadata> fileTable;
 
     public FileSystem(DiskDrive diskDrive, String allocationMethod) {
         this.diskDrive = diskDrive;
@@ -276,22 +277,29 @@ public class FileSystem {
     private List<Integer> findFreeBlocksChained(int dataSize) {
         int requiredBlocks = (int) Math.ceil((double) dataSize / DiskDrive.getBlockSize());
         List<Integer> freeBlocks = new ArrayList<>();
-
+        List<Integer> potentialBlocks = new ArrayList<>();
+    
+        // Populate the list with indices of all free blocks
         byte[] bitmap = diskDrive.readBlock(1); // Assuming bitmap is stored in block 1
-        for (int i = 0; i < bitmap.length * 8; i++) {
+        for (int i = 0; i < DiskDrive.NUM_BLOCKS; i++) {
             if (isBlockFree(bitmap, i)) {
-                freeBlocks.add(i);
-                if (freeBlocks.size() == requiredBlocks) {
-                break;
-                }
+                potentialBlocks.add(i);
             }
         }
-
+    
+        // Randomly pick blocks from the list of potential blocks
+        Random random = new Random();
+        while (!potentialBlocks.isEmpty() && freeBlocks.size() < requiredBlocks) {
+            int randomIndex = random.nextInt(potentialBlocks.size());
+            freeBlocks.add(potentialBlocks.remove(randomIndex));
+        }
+    
         if (freeBlocks.size() < requiredBlocks) {
             return Collections.emptyList(); // Not enough space
         }
         return freeBlocks;
     }
+    
     
     private void chainAndWriteBlocks(List<Integer> blocks, byte[] data) {
         int bytesPerBlock = DiskDrive.getBlockSize() - 1; // Last byte for next block reference

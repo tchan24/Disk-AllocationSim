@@ -1,5 +1,8 @@
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.IntStream;
 
@@ -40,14 +43,18 @@ public class FileSystem {
             throw new IllegalArgumentException("File size exceeds maximum limit");
         }
 
-        int[] freeBlocks = findFreeBlocksContiguous(data.length);
-        if (freeBlocks.length == 0) {
-            throw new IllegalStateException("Not enough contiguous space");
+        List<Integer> freeBlocks = findFreeBlocksChained(data.length);
+        if (freeBlocks.isEmpty()) {
+            throw new IllegalStateException("Not enough space");
         }
 
-        writeDataToBlocks(freeBlocks, data);
-        updateFAT(fileName, freeBlocks[0], freeBlocks.length);
-        updateBitmap(freeBlocks, true);
+        chainAndWriteBlocks(freeBlocks, data);
+        updateFATForChained(fileName, freeBlocks.get(0));
+        updateBitmap(convertListToArray(freeBlocks), true); // Convert to array before updating bitmap
+    }
+
+    private int[] convertListToArray(List<Integer> list) {
+        return list.stream().mapToInt(i -> i).toArray();
     }
 
     public byte[] readFile(String fileName) {
@@ -166,5 +173,36 @@ public class FileSystem {
         return diskDrive.readBlock(blockNumber);
     }
     
+    private List<Integer> findFreeBlocksChained(int dataSize) {
+        int requiredBlocks = (int) Math.ceil((double) dataSize / DiskDrive.getBlockSize());
+        List<Integer> freeBlocks = new ArrayList<>();
+
+        byte[] bitmap = diskDrive.readBlock(1); // Assuming bitmap is stored in block 1
+        for (int i = 0; i < bitmap.length * 8; i++) {
+            if (isBlockFree(bitmap, i)) {
+                freeBlocks.add(i);
+                if (freeBlocks.size() == requiredBlocks) {
+                break;
+                }
+            }
+        }
+
+        if (freeBlocks.size() < requiredBlocks) {
+            return Collections.emptyList(); // Not enough space
+        }
+        return freeBlocks;
+    }
+    
+    private void chainAndWriteBlocks(List<Integer> blocks, byte[] data) {
+        // Logic to write and chain blocks
+        // Convert List<Integer> to int[] if needed, or adjust logic to work with List<Integer>
+        // ...
+    }
+    
+    private void updateFATForChained(String fileName, int startBlock) {
+        // Update FAT with the start block for the file
+        // ...
+    }
+
     // Additional methods like updateFile, deleteFile, etc. will be added in subsequent parts
 }

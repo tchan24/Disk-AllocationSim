@@ -159,33 +159,34 @@ public class FileSystem {
         if (metadata == null) {
             throw new IllegalArgumentException("File not found");
         }
-
+    
         if (allocationMethod.equals("contiguous")) {
-            deleteFileContiguous(metadata);
+            deleteFileContiguous(fileName);
         } else if (allocationMethod.equals("chained")) {
             deleteFileChained(metadata);
         } else {
             throw new IllegalStateException("Unknown allocation method: " + allocationMethod);
         }
     }
+    
 
-    private void deleteFileContiguous(FileMetadata metadata) {
-        // Check if the file exists
+    private void deleteFileContiguous(String fileName) {
         FileMetadata metadata = fileTable.get(fileName);
         if (metadata == null) {
             throw new IllegalArgumentException("File not found");
         }
-
+    
         // Mark the blocks as free in the bitmap
         int[] blocks = new int[metadata.getLength()];
         for (int i = 0; i < metadata.getLength(); i++) {
             blocks[i] = metadata.getStartBlock() + i;
         }
         updateBitmap(blocks, false);
-
+    
         // Remove the file entry from the FAT
         fileTable.remove(fileName);
     }
+    
     
     private void deleteFileChained(FileMetadata metadata) {
         int currentBlock = metadata.getStartBlock();
@@ -293,15 +294,27 @@ public class FileSystem {
     }
     
     private void chainAndWriteBlocks(List<Integer> blocks, byte[] data) {
-        // Logic to write and chain blocks
-        // Convert List<Integer> to int[] if needed, or adjust logic to work with List<Integer>
-        // ...
+        int bytesPerBlock = DiskDrive.getBlockSize() - 1; // Last byte for next block reference
+        int dataIndex = 0;
+    
+        for (int i = 0; i < blocks.size(); i++) {
+            byte[] blockData = new byte[DiskDrive.getBlockSize()];
+            int nextBlock = (i == blocks.size() - 1) ? -1 : blocks.get(i + 1); // -1 indicates the end
+    
+            int length = Math.min(dataIndex + bytesPerBlock, data.length) - dataIndex;
+            System.arraycopy(data, dataIndex, blockData, 0, length);
+            blockData[bytesPerBlock] = (byte) nextBlock; // Set next block reference
+    
+            diskDrive.writeBlock(blocks.get(i), blockData);
+            dataIndex += length;
+        }
     }
     
+    
     private void updateFATForChained(String fileName, int startBlock) {
-        // Update FAT with the start block for the file
-        // ...
+        fileTable.put(fileName, new FileMetadata(startBlock, -1)); // Length might not be needed for chained
     }
+    
 
     // Additional methods like updateFile, deleteFile, etc. will be added in subsequent parts
 }

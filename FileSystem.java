@@ -147,7 +147,7 @@ public class FileSystem {
             byte[] blockData = diskDrive.readBlock(blockNumber);
             outputStream.write(blockData, 0, DiskDrive.getBlockSize());
         }
-    
+
         return outputStream.toByteArray();
     }
     

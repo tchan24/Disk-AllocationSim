@@ -135,18 +135,22 @@ public class FileSystem {
     }
 
     private byte[] readFileContiguous(FileMetadata metadata) {
-        
-        if (metadata == null) {
-            throw new IllegalArgumentException("File not found");
+        int startBlock = metadata.getStartBlock();
+        int length = metadata.getLength(); // Length in blocks
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+    
+        for (int i = 0; i < length; i++) {
+            int blockNumber = startBlock + i;
+            if (blockNumber >= DiskDrive.NUM_BLOCKS) {
+                throw new IllegalStateException("Invalid block number: " + blockNumber);
+            }
+            byte[] blockData = diskDrive.readBlock(blockNumber);
+            outputStream.write(blockData, 0, DiskDrive.getBlockSize());
         }
-
-        byte[] data = new byte[metadata.getLength() * DiskDrive.getBlockSize()];
-        for (int i = 0; i < metadata.getLength(); i++) {
-            byte[] blockData = diskDrive.readBlock(metadata.getStartBlock() + i);
-            System.arraycopy(blockData, 0, data, i * DiskDrive.getBlockSize(), blockData.length);
-        }
-        return data;
+    
+        return outputStream.toByteArray();
     }
+    
 
     private byte[] readFileChained(FileMetadata metadata) {
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
